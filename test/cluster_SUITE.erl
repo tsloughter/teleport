@@ -42,7 +42,7 @@ init_per_testcase(Case, Config) ->
     [{nodes, Nodes}|Config].
 
 end_per_testcase(_, _Config) ->
-    test_utils:pmap(fun(Node) ->ct_slave:stop(Node) end, ?NODES),
+    test_utils:pmap(fun(Node) -> ct_slave:stop(Node) end, ?NODES),
     ok.
 
 all() ->
@@ -111,7 +111,7 @@ start_server(Nodes, I, Number) ->
                  %Start++End
          end,
     {ok, _Pid} = rpc:call(N, send_server, start, [Number, NL]),
-    %link(_Pid),
+    %%link(_Pid),
     ok.
 
 make_name(I) ->

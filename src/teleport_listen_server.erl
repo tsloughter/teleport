@@ -1,60 +1,71 @@
 -module(teleport_listen_server).
+
 -behaviour(gen_server).
 
-%% API
+%% public api
+
 -export([start_link/0]).
 
-%% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+%% gen_server api
 
--export([loop/2]).
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         code_change/3,
+         terminate/2]).
 
--record(state, {
-          socket :: gen_tcp:socket(),
-          port :: pos_integer()
-         }).
+-record(state, {socket :: inet:sock(),
+                ref    :: reference(),
+                port   :: inet:port()}).
+
+%% public api
 
 start_link() ->
-  gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+%% gen_server api
 
 init([]) ->
-  {ok, Sock} = gen_tcp:listen(0, [binary, {packet, 4}, {active, false}]),
-  {ok, Port} = inet:port(Sock),
-  spawn_link(?MODULE, loop, [self(), Sock]),
-  {ok, #state{socket=Sock, port=Port}}.
+    AcceptorPoolSize = application:get_env(teleport, acceptor_pool_size, 20),
+    % Trapping exit so can close socket in terminate/2
+    _ = process_flag(trap_exit, true),
+    Opts = [{active, false}, {mode, binary}, {packet, 4}],
+    case gen_tcp:listen(0, Opts) of
+        {ok, Socket} ->
+            % acceptor could close the socket if there is a problem
+            MRef = monitor(port, Socket),
+            {ok, Port} = inet:port(Socket),
+            teleport_acceptor_pool:accept_socket(Socket, AcceptorPoolSize),
+            {ok, #state{socket=Socket,
+                        ref=MRef,
+                        port=Port}};
+        {error, Reason} ->
+            {stop, Reason}
+    end.
 
-handle_call(get_port, _From, State) ->
-  {reply, {ok, State#state.port}, State};
-handle_call(_Msg, _From, State) ->
-  io:format("unhandled call ~p~n", [_Msg]),
-  {reply, unknown, State}.
+handle_call(get_port, _, State=#state{port=Port}) ->
+    {reply, {ok, Port}, State};
+handle_call(Req, _, State) ->
+    {stop, {bad_call, Req}, State}.
 
-handle_cast(_Msg, State) ->
-  io:format("unhandled cast ~p~n", [_Msg]),
-  {noreply, State}.
+handle_cast(Req, State) ->
+    {stop, {bad_cast, Req}, State}.
 
-handle_info(_Msg, State) ->
-  io:format("unhandled info ~p~n", [_Msg]),
-  {noreply, State}.
+handle_info({'DOWN', MRef, port, Socket, Reason}, State=#state{socket=Socket,
+                                                               ref=MRef}) ->
+    {stop, Reason, State};
+handle_info(_, State) ->
+    {noreply, State}.
 
-terminate(_Reason, _State) ->
-      ok.
-
-code_change(_OldVsn, State, _Extra) ->
+code_change(_, State, _) ->
     {ok, State}.
 
-loop(Parent, ListenSock) ->
-  {ok, Sock} = gen_tcp:accept(ListenSock),
-  case teleport_socket_sup:add_socket(Sock) of
-    {ok, Pid} ->
-      case gen_tcp:controlling_process(Sock, Pid) of
-        ok ->
-          ok;
-        Error ->
-          io:format("error setting controlling_process ~p~n", [Error])
-      end;
-    Error2 ->
-      io:format("error starting socket handler ~p~n", [Error2])
-  end,
-  loop(Parent, ListenSock).
+terminate(_, #state{socket=Socket,
+                    ref=MRef}) ->
+    % Socket may already be down but need to ensure it is closed to avoid
+    % eaddrinuse error on restart
+    case demonitor(MRef, [flush, info]) of
+        true  -> gen_tcp:close(Socket);
+        false -> ok
+    end.

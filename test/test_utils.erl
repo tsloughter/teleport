@@ -107,7 +107,6 @@ start_node(Name, Config, Case) ->
                     ]}],
     case ct_slave:start(Name, NodeConfig) of
         {ok, Node} ->
-
             %PrivDir = proplists:get_value(priv_dir, Config),
             %NodeDir = filename:join([PrivDir, Node, Case]),
             {ok, _} = rpc:call(Node, application, ensure_all_started, [teleport]),
@@ -141,4 +140,3 @@ heal_cluster(ANodes, BNodes) ->
         end,
          [{Node1, Node2} || Node1 <- ANodes, Node2 <- BNodes]),
     ok.
-

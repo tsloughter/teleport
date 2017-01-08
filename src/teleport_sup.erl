@@ -4,7 +4,8 @@
 
 %% public api
 
--export([start_link/0]).
+-export([start_link/0,
+         start_child/1]).
 
 %% supervisor api
 
@@ -15,7 +16,9 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-%% supervisor api
+start_child(Node) ->
+    supervisor:start_child(?MODULE, #{id => {teleport_broker_sup, Node},
+                                      start => {teleport_broker_sup, start_link, [Node]}}).
 
 init([]) ->
     Flags = #{strategy => rest_for_one},

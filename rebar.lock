@@ -6,6 +6,7 @@
        {ref,"d3d29b9431cfbdc6766e3c18ba17b9d2624a70b2"}},
   1},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.2.4">>},0},
+ {<<"sbroker">>,{pkg,<<"sbroker">>,<<"0.7.0">>},0},
  {<<"shackle">>,
   {git,"https://github.com/lpgauth/shackle.git",
        {ref,"500cdb937dbd62e94bf4bdcd13c156407ad59181"}},
@@ -14,5 +15,6 @@
 {pkg_hash,[
  {<<"acceptor_pool">>, <<"679D741DF87FC13599B1AEF2DF8F78F1F880449A6BEFAB7C44FB6FAE0E92A2DE">>},
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
- {<<"lager">>, <<"A6DEB74DAE7927F46BD13255268308EF03EB206EC784A94EAF7C1C0F3B811615">>}]}
+ {<<"lager">>, <<"A6DEB74DAE7927F46BD13255268308EF03EB206EC784A94EAF7C1C0F3B811615">>},
+ {<<"sbroker">>, <<"9A26D096E8EFA94084CCFD640228B1C93569EA3FC3F61917B322AA8BCA3C66B6">>}]}
 ].

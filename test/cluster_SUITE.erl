@@ -37,6 +37,7 @@ init_per_testcase(Case, Config) ->
     Nodes = test_utils:pmap(fun(N) ->
                                     test_utils:start_node(N, Config, Case)
                             end, ?NODES),
+    [rpc:call(N, teleport, connect, [Nodes -- [N]]) || N <- Nodes],
     [start_server(Nodes, N-1, 0) || N <- lists:seq(1, length(Nodes))],
     {ok, _} = ct_cover:add_nodes(Nodes),
     [{nodes, Nodes}|Config].

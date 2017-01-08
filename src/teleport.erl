@@ -1,13 +1,14 @@
 -module(teleport).
 
--export([send/2, connect/1, gs_call/3, start/0, term_to_iolist/1]).
+-export([send/2, connect/1, gs_call/3, start/0, term_to_iolist/1, ip_and_port/1, name_for_node/1]).
 
 start() ->
   application:ensure_all_started(teleport).
 
+connect(Nodes) when is_list(Nodes) ->
+    [connect(N) || N <- Nodes];
 connect(Node) ->
-    {Host, Port} = ip_and_port(Node),
-    catch teleport_client_pool:start(Node, Host, Port).
+    teleport_sup:start_child(Node).
 
 send(Process, Message) ->
     Node = get_node(Process),
@@ -50,7 +51,17 @@ node_addressable(Node) ->
   end.
 
 do_send(Process, Name, Msg) ->
-    shackle:cast(Name, {send, get_dest(Process), Msg}).
+    {ok, Conn={Socket, _, _}} = get_conn(name_for_node(Name)),
+    gen_tcp:send(Socket, term_to_iolist({send, get_dest(Process), Msg})),
+    teleport_conn:done(Conn).
+
+get_conn(Name) ->
+    case sbroker:ask(Name) of
+        {go, Ref, {Pid, Conn}, _RelativeTime, _SojournTime} ->
+            {ok, {Conn, Pid, Ref}};
+        {drop, _N} ->
+            {error, timeout}
+    end.
 
 get_node({Name, Node}) when is_atom(Name), is_atom(Node) ->
     Node;
@@ -61,6 +72,9 @@ get_dest({Name, Node}) when is_atom(Name), is_atom(Node) ->
     Name;
 get_dest(Pid) when is_pid(Pid) ->
     Pid.
+
+name_for_node(Node) ->
+  list_to_atom(lists:flatten(io_lib:format("~s_~s", [teleport, Node]))).
 
 term_to_iolist(Term) ->
     [131, term_to_iolist_(Term)].
